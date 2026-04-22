@@ -33,6 +33,13 @@ pub fn run() {
             ws::register(app);
             app.manage(ai_cmds::AiState::new());
 
+            // Diagnostic: auto-open DevTools on launch so users can inspect
+            // console logs without needing a right-click menu. Remove this
+            // block once the investigation is complete.
+            if let Some(win) = app.get_webview_window("main") {
+                win.open_devtools();
+            }
+
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 match db::init().await {
