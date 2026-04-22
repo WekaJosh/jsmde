@@ -11,8 +11,13 @@
 	let expanded = $state<Record<string, boolean>>({});
 	let children = $state<Record<string, DirEntry[]>>({});
 
-	// The workspace store's watcher listener handles refresh on changeTick;
-	// no need to duplicate it here.
+	$effect(() => {
+		// reload top-level when workspace root or external changes bump
+		workspace.changeTick;
+		if (workspace.root) {
+			void workspace.refresh();
+		}
+	});
 
 	function isMarkdown(e: DirEntry) {
 		if (e.is_dir) return true;
