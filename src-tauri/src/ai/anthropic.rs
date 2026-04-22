@@ -82,6 +82,38 @@ impl AiProvider for Anthropic {
 
         Ok(Box::pin(stream))
     }
+
+    async fn list_models(&self, api_key: &str) -> Result<Vec<String>, String> {
+        if api_key.is_empty() {
+            return Err("missing API key".into());
+        }
+        let res = super::models_client()?
+            .get("https://api.anthropic.com/v1/models")
+            .header("x-api-key", api_key)
+            .header("anthropic-version", "2023-06-01")
+            .send()
+            .await
+            .map_err(|e| format!("anthropic request: {e}"))?;
+        if !res.status().is_success() {
+            let status = res.status();
+            let body = res.text().await.unwrap_or_default();
+            return Err(format!("anthropic http {status}: {body}"));
+        }
+        let v: Value = res
+            .json()
+            .await
+            .map_err(|e| format!("anthropic parse: {e}"))?;
+        let models = v
+            .get("data")
+            .and_then(|d| d.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|m| m.get("id").and_then(|n| n.as_str()).map(String::from))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        Ok(models)
+    }
 }
 
 fn parse_content_delta(data: &str) -> Option<String> {

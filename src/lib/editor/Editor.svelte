@@ -117,17 +117,60 @@
 		lastSynced = initial;
 		suppressUpdate = false;
 		editor = ed;
+
+		const teardownVisibility = setupBlockVisibility(ed);
+
 		return () => {
+			teardownVisibility();
 			ed.destroy();
 			if (editor === ed) editor = null;
 		};
 	});
 
+	// Explicit render buffer for large documents. Blocks far from the viewport
+	// get `content-visibility: auto`, so the browser skips their layout. Blocks
+	// within 2000px of the viewport get .in-range, which forces normal layout
+	// so fast scroll after a resize doesn't flash placeholder boxes.
+	function setupBlockVisibility(ed: Editor): () => void {
+		const dom = ed.view.dom as HTMLElement;
+		const observed = new Set<Element>();
+		const io = new IntersectionObserver(
+			(entries) => {
+				for (const e of entries) {
+					e.target.classList.toggle('in-range', e.isIntersecting);
+				}
+			},
+			{ rootMargin: '2000px 0px 2000px 0px' }
+		);
+		const syncObservations = () => {
+			const current = new Set<Element>(Array.from(dom.children));
+			for (const el of observed) {
+				if (!current.has(el)) {
+					io.unobserve(el);
+					observed.delete(el);
+				}
+			}
+			for (const el of current) {
+				if (!observed.has(el)) {
+					io.observe(el);
+					observed.add(el);
+				}
+			}
+		};
+		syncObservations();
+		const mo = new MutationObserver(syncObservations);
+		mo.observe(dom, { childList: true });
+		return () => {
+			io.disconnect();
+			mo.disconnect();
+			observed.clear();
+		};
+	}
+
 	$effect(() => {
 		const nextValue = value;
 		if (!editor) return;
 		if (nextValue === lastSynced) return;
-		console.debug('[editor] setContent', nextValue.length, 'chars');
 		suppressUpdate = true;
 		fromMarkdown(editor, nextValue);
 		// Track the INPUT we just loaded, not the round-tripped serialization.
@@ -161,6 +204,13 @@
 <style>
 	:global(.ProseMirror) {
 		min-height: 100%;
+	}
+	/* Render buffer for large docs: blocks far from the viewport get their
+	   layout/paint skipped. An IntersectionObserver adds .in-range to blocks
+	   within 2000px of the viewport so scroll never reveals an unlaid block. */
+	:global(.ProseMirror > *:not(.in-range)) {
+		content-visibility: auto;
+		contain-intrinsic-size: auto 40px;
 	}
 	:global(.ProseMirror p.is-editor-empty:first-child::before) {
 		color: #a3a3a3;

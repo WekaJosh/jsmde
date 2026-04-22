@@ -76,6 +76,46 @@ impl AiProvider for OpenAi {
 
         Ok(Box::pin(stream))
     }
+
+    async fn list_models(&self, api_key: &str) -> Result<Vec<String>, String> {
+        if api_key.is_empty() {
+            return Err("missing API key".into());
+        }
+        let res = super::models_client()?
+            .get("https://api.openai.com/v1/models")
+            .bearer_auth(api_key)
+            .send()
+            .await
+            .map_err(|e| format!("openai request: {e}"))?;
+        if !res.status().is_success() {
+            let status = res.status();
+            let body = res.text().await.unwrap_or_default();
+            return Err(format!("openai http {status}: {body}"));
+        }
+        let v: Value = res.json().await.map_err(|e| format!("openai parse: {e}"))?;
+        let mut models: Vec<String> = v
+            .get("data")
+            .and_then(|d| d.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|m| m.get("id").and_then(|n| n.as_str()).map(String::from))
+                    .filter(|id| is_chat_model(id))
+                    .collect()
+            })
+            .unwrap_or_default();
+        models.sort();
+        Ok(models)
+    }
+}
+
+fn is_chat_model(id: &str) -> bool {
+    // Keep chat-capable models; drop embeddings, whisper, tts, dalle, etc.
+    let prefixes = ["gpt-", "o1", "o3", "o4", "chatgpt-"];
+    if !prefixes.iter().any(|p| id.starts_with(p)) {
+        return false;
+    }
+    let exclude = ["-embedding", "-realtime", "-audio", "-tts", "-transcribe", "-image"];
+    !exclude.iter().any(|e| id.contains(e))
 }
 
 fn parse_delta(data: &str) -> Option<String> {

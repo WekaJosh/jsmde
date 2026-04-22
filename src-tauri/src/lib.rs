@@ -33,9 +33,11 @@ pub fn run() {
             ws::register(app);
             app.manage(ai_cmds::AiState::new());
 
-            // Diagnostic: auto-open DevTools on launch so users can inspect
-            // console logs without needing a right-click menu. Remove this
-            // block once the investigation is complete.
+            // Open DevTools automatically in debug builds only. In release,
+            // the `devtools` Cargo feature keeps them available but not
+            // auto-opened; there's no built-in UI to toggle them since Tauri
+            // disables the right-click menu.
+            #[cfg(debug_assertions)]
             if let Some(win) = app.get_webview_window("main") {
                 win.open_devtools();
             }
@@ -65,6 +67,7 @@ pub fn run() {
             ai_cmds::ai_has_key,
             ai_cmds::ai_chat_stream,
             ai_cmds::ai_cancel,
+            ai_cmds::ai_list_models,
             sync_cmds::gdrive_status,
             sync_cmds::gdrive_save_client_id,
             sync_cmds::gdrive_sign_in,

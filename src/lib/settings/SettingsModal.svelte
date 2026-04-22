@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { PROVIDER_IDS, PROVIDERS, type ProviderId } from '$lib/ai/providers';
 	import { aiStore } from '$lib/ai/store.svelte';
-	import { deleteApiKey, hasApiKey, saveApiKey } from '$lib/ai/client';
+	import { deleteApiKey, hasApiKey, listModels, saveApiKey } from '$lib/ai/client';
 	import CloudPane from './CloudPane.svelte';
 	import RagPane from './RagPane.svelte';
 	import { ragStore } from '$lib/rag/store.svelte';
@@ -29,10 +29,52 @@
 	let saving = $state(false);
 	let statusText = $state<string | null>(null);
 
+	// Live-fetched models per provider. null = not yet loaded.
+	let liveModels = $state<Record<ProviderId, string[] | null>>({
+		anthropic: null,
+		openai: null,
+		google: null,
+		ollama: null
+	});
+	let modelsLoading = $state<Record<ProviderId, boolean>>({
+		anthropic: false,
+		openai: false,
+		google: false,
+		ollama: false
+	});
+	let modelsError = $state<Record<ProviderId, string | null>>({
+		anthropic: null,
+		openai: null,
+		google: null,
+		ollama: null
+	});
+
 	$effect(() => {
 		if (!open) return;
 		void refreshKeys();
 	});
+
+	$effect(() => {
+		if (!open) return;
+		const id = selectedProvider;
+		if (liveModels[id] === null && !modelsLoading[id]) {
+			void fetchModels(id);
+		}
+	});
+
+	async function fetchModels(id: ProviderId) {
+		modelsLoading[id] = true;
+		modelsError[id] = null;
+		try {
+			const models = await listModels(id);
+			liveModels[id] = models;
+		} catch (e) {
+			liveModels[id] = [];
+			modelsError[id] = String(e).replace(/^Error:\s*/, '');
+		} finally {
+			modelsLoading[id] = false;
+		}
+	}
 
 	$effect(() => {
 		if (!open) return;
@@ -209,17 +251,46 @@
 							>
 								Default model
 							</label>
-							<input
-								id="settings-model-input"
-								class="w-full rounded border border-neutral-300 bg-white px-2 py-1 text-sm outline-none focus:border-neutral-500 dark:border-neutral-700 dark:bg-neutral-950"
-								list="model-suggestions-{selectedProvider}"
-								bind:value={modelInput}
-							/>
+							<div class="flex gap-2">
+								<input
+									id="settings-model-input"
+									class="flex-1 rounded border border-neutral-300 bg-white px-2 py-1 text-sm outline-none focus:border-neutral-500 dark:border-neutral-700 dark:bg-neutral-950"
+									list="model-suggestions-{selectedProvider}"
+									bind:value={modelInput}
+								/>
+								<button
+									type="button"
+									class="rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+									title="Refresh model list"
+									onclick={() => fetchModels(selectedProvider)}
+									disabled={modelsLoading[selectedProvider]}
+								>
+									{#if modelsLoading[selectedProvider]}
+										<span class="inline-block animate-spin">⟳</span>
+									{:else}
+										↻
+									{/if}
+								</button>
+							</div>
 							<datalist id="model-suggestions-{selectedProvider}">
-								{#each info.models as m (m)}
+								{#each (liveModels[selectedProvider] && liveModels[selectedProvider]!.length > 0 ? liveModels[selectedProvider]! : info.models) as m (m)}
 									<option value={m}></option>
 								{/each}
 							</datalist>
+							<p class="mt-1 text-[11px] text-neutral-500">
+								{#if modelsLoading[selectedProvider]}
+									Fetching available models…
+								{:else if liveModels[selectedProvider] && liveModels[selectedProvider]!.length > 0}
+									{liveModels[selectedProvider]!.length} model{liveModels[selectedProvider]!
+										.length === 1
+										? ''
+										: 's'} available from {info.label}.
+								{:else if modelsError[selectedProvider]}
+									Couldn't fetch live list ({modelsError[selectedProvider]}); showing built-in suggestions.
+								{:else}
+									Free-text. Suggestions shown on click/keyboard.
+								{/if}
+							</p>
 						</div>
 
 						{#if statusText}

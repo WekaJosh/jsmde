@@ -31,7 +31,44 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 	let aiOpen = $state(true);
 	let settingsOpen = $state(false);
 
+	let loading = $state(false);
+	let loadingFile = $state<string | null>(null);
+	let loadingStartMs = $state(0);
+	let loadingElapsedMs = $state(0);
+
 	let saveTimer: ReturnType<typeof setTimeout> | null = null;
+	let loadingTimer: ReturnType<typeof setInterval> | null = null;
+
+	function startLoading(fileName: string | null) {
+		loading = true;
+		loadingFile = fileName;
+		loadingStartMs = Date.now();
+		loadingElapsedMs = 0;
+		if (loadingTimer) clearInterval(loadingTimer);
+		loadingTimer = setInterval(() => {
+			loadingElapsedMs = Date.now() - loadingStartMs;
+		}, 100);
+	}
+
+	function stopLoading() {
+		loading = false;
+		loadingFile = null;
+		loadingElapsedMs = 0;
+		if (loadingTimer) {
+			clearInterval(loadingTimer);
+			loadingTimer = null;
+		}
+	}
+
+	function basename(path: string): string {
+		const parts = path.split(/[\\/]/);
+		return parts[parts.length - 1] || path;
+	}
+
+	function fmtElapsed(ms: number): string {
+		if (ms < 1000) return `${ms}ms`;
+		return `${(ms / 1000).toFixed(1)}s`;
+	}
 
 	onMount(() => {
 		void workspace.init().then(async () => {
@@ -51,13 +88,11 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 		// Reload the open file when the watcher fires a change and it's our file
 		workspace.changeTick;
 		const path = loadedPath;
-		console.debug('[reload] fire', { tick: workspace.changeTick, path, dirty });
 		if (!path) return;
 		void (async () => {
 			try {
 				const next = await readFile(path);
 				if (!dirty && next !== docText) {
-					console.debug('[reload] applying', path);
 					docText = next;
 					status = `Reloaded · ${path}`;
 				}
@@ -75,17 +110,22 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 	}
 
 	async function openPath(path: string) {
-		console.debug('[openPath] start', path);
+		startLoading(basename(path));
 		try {
-			docText = await readFile(path);
+			const content = await readFile(path);
+			docText = content;
 			loadedPath = path;
 			dirty = false;
 			status = path;
 			await workspace.setOpenPath(path);
-			console.debug('[openPath] done', path);
+			// Wait one animation frame so the editor's synchronous setContent
+			// (triggered by the docText change) has a chance to complete before
+			// we hide the loading indicator.
+			await new Promise<void>((r) => requestAnimationFrame(() => r()));
 		} catch (e) {
-			console.debug('[openPath] err', e);
 			status = `Open failed: ${e}`;
+		} finally {
+			stopLoading();
 		}
 	}
 
@@ -120,25 +160,21 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 	let creating = $state(false);
 
 	async function newFile() {
-		console.debug('[newFile] start');
-		if (creating) {
-			console.debug('[newFile] already creating, bail');
-			return;
-		}
+		if (creating) return;
 		if (!workspace.root) {
 			status = 'Open a workspace folder first to create a new file.';
 			return;
 		}
 		creating = true;
+		startLoading(null);
 		try {
 			if (loadedPath && dirty) {
-				console.debug('[newFile] saving dirty');
 				await save();
 			}
 			await workspace.refresh();
 			const name = uniqueUntitled(workspace.entries);
 			const target = joinPath(workspace.root, name);
-			console.debug('[newFile] write', target);
+			loadingFile = name;
 			await writeFile(target, '');
 			docText = '';
 			loadedPath = target;
@@ -146,12 +182,12 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 			status = `New file · ${target}`;
 			await workspace.setOpenPath(target);
 			await workspace.refresh();
-			console.debug('[newFile] done');
+			await new Promise<void>((r) => requestAnimationFrame(() => r()));
 		} catch (e) {
-			console.debug('[newFile] err', e);
 			status = `New file failed: ${e}`;
 		} finally {
 			creating = false;
+			stopLoading();
 		}
 	}
 
@@ -224,6 +260,14 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 <svelte:window onkeydown={onKeydown} />
 
 <div class="flex h-screen flex-col">
+	<div
+		class="pointer-events-none fixed top-0 left-0 right-0 z-50 h-[2px] overflow-hidden"
+		aria-hidden="true"
+	>
+		{#if loading}
+			<div class="progress-bar h-full bg-blue-500 dark:bg-blue-400"></div>
+		{/if}
+	</div>
 	<header
 		class="flex items-center justify-between border-b border-neutral-200 bg-white/70 px-4 py-2 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/70"
 	>
@@ -262,7 +306,8 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 				Open file
 			</button>
 			<button
-				class="rounded-md bg-neutral-900 px-3 py-1 text-sm text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+				class="rounded-md border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+				title="Save (⌘S)"
 				onclick={() => (loadedPath ? save() : saveAs())}
 			>
 				Save
@@ -280,18 +325,22 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 				{/if}
 			</button>
 			<button
-				class="rounded-md border border-neutral-300 px-2 py-1 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-				title="Toggle AI panel"
+				class="rounded-md border px-2 py-1 text-sm {aiOpen
+					? 'border-neutral-400 bg-neutral-100 dark:border-neutral-600 dark:bg-neutral-800'
+					: 'border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800'}"
+				title={aiOpen ? 'Close AI panel' : 'Open AI panel'}
+				aria-pressed={aiOpen}
 				onclick={() => (aiOpen = !aiOpen)}
 			>
 				✨ AI
 			</button>
 			<button
-				class="rounded-md border border-neutral-300 px-2 py-1 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+				class="rounded-md border border-neutral-300 px-2 py-1 text-base leading-none hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
 				title="Settings"
+				aria-label="Settings"
 				onclick={() => (settingsOpen = true)}
 			>
-				⚙
+				⚙️
 			</button>
 		</div>
 	</header>
@@ -319,7 +368,17 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 	<footer
 		class="flex items-center justify-between gap-3 border-t border-neutral-200 px-4 py-1 text-xs text-neutral-500 dark:border-neutral-800"
 	>
-		<span class="truncate">{status}</span>
+		<span class="flex min-w-0 items-center gap-2 truncate">
+			{#if loading}
+				<span class="inline-block animate-spin text-blue-600 dark:text-blue-400">⟳</span>
+				<span class="truncate">
+					Loading{loadingFile ? ` ${loadingFile}` : '…'}
+				</span>
+				<span class="shrink-0 tabular-nums text-neutral-400">{fmtElapsed(loadingElapsedMs)}</span>
+			{:else}
+				<span class="truncate">{status}</span>
+			{/if}
+		</span>
 		<span class="flex items-center gap-3">
 			{#if syncStore.lastReport}
 				<span
@@ -341,3 +400,25 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 </div>
 
 <SettingsModal open={settingsOpen} onClose={() => (settingsOpen = false)} />
+
+<style>
+	.progress-bar {
+		width: 40%;
+		animation: progress-slide 1.1s ease-in-out infinite;
+		will-change: transform, margin-left;
+	}
+	@keyframes progress-slide {
+		0% {
+			margin-left: -40%;
+			width: 40%;
+		}
+		50% {
+			margin-left: 30%;
+			width: 50%;
+		}
+		100% {
+			margin-left: 100%;
+			width: 40%;
+		}
+	}
+</style>

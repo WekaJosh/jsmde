@@ -123,3 +123,12 @@ pub fn ai_cancel(state: State<'_, AiState>, request_id: String) -> Result<(), St
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn ai_list_models(provider: String) -> Result<Vec<String>, String> {
+    let api_key = keychain::get_secret(&key_account(&provider))?.unwrap_or_default();
+    let Some(impl_) = get_provider(&provider) else {
+        return Err(format!("unknown provider: {provider}"));
+    };
+    impl_.list_models(&api_key).await
+}

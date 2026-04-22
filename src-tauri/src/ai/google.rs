@@ -81,6 +81,46 @@ impl AiProvider for Google {
             stream.chain(futures_util::stream::iter(vec![StreamChunk::Done])),
         ))
     }
+
+    async fn list_models(&self, api_key: &str) -> Result<Vec<String>, String> {
+        if api_key.is_empty() {
+            return Err("missing API key".into());
+        }
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models?key={}",
+            api_key
+        );
+        let res = super::models_client()?
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("google request: {e}"))?;
+        if !res.status().is_success() {
+            let status = res.status();
+            let body = res.text().await.unwrap_or_default();
+            return Err(format!("google http {status}: {body}"));
+        }
+        let v: Value = res.json().await.map_err(|e| format!("google parse: {e}"))?;
+        // Keep only models that support generateContent (chat-capable).
+        let models = v
+            .get("models")
+            .and_then(|d| d.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter(|m| {
+                        m.get("supportedGenerationMethods")
+                            .and_then(|g| g.as_array())
+                            .map(|a| a.iter().any(|v| v.as_str() == Some("generateContent")))
+                            .unwrap_or(true)
+                    })
+                    .filter_map(|m| m.get("name").and_then(|n| n.as_str()))
+                    // API returns "models/gemini-..."; strip the "models/" prefix for display.
+                    .map(|n| n.strip_prefix("models/").unwrap_or(n).to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        Ok(models)
+    }
 }
 
 fn parse_google(data: &str) -> Option<String> {

@@ -31,6 +31,18 @@ export async function hasApiKey(provider: ProviderId): Promise<boolean> {
 	return invoke<boolean>('ai_has_key', { provider });
 }
 
+// Belt-and-suspenders timeout: the Rust side already has a 5s/3s reqwest
+// timeout, but if that ever wedges (e.g. a future Tauri bridge bug, or a
+// bad proxy layer), we guarantee the Promise rejects within 8s so the
+// settings UI can never be stuck with a spinning indicator.
+export async function listModels(provider: ProviderId): Promise<string[]> {
+	const call = invoke<string[]>('ai_list_models', { provider });
+	const timeout = new Promise<string[]>((_, reject) =>
+		setTimeout(() => reject(new Error('timed out after 8s')), 8000)
+	);
+	return Promise.race([call, timeout]);
+}
+
 function randomId() {
 	return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }

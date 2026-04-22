@@ -103,6 +103,29 @@ impl AiProvider for Ollama {
         let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx);
         Ok(Box::pin(stream))
     }
+
+    async fn list_models(&self, api_key: &str) -> Result<Vec<String>, String> {
+        let url = format!("{}/api/tags", base_url(api_key));
+        let res = super::models_client()?
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("ollama request: {e}"))?;
+        if !res.status().is_success() {
+            return Err(format!("ollama list_models http {}", res.status()));
+        }
+        let v: Value = res.json().await.map_err(|e| format!("ollama parse: {e}"))?;
+        let models = v
+            .get("models")
+            .and_then(|m| m.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|m| m.get("name").and_then(|n| n.as_str()).map(String::from))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        Ok(models)
+    }
 }
 
 fn parse_ollama(data: &str) -> Vec<StreamChunk> {
