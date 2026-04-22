@@ -10,9 +10,29 @@
 	type Props = {
 		value: string;
 		onChange: (next: string) => void;
+		flushRef?: (flush: () => void) => void;
 	};
 
-	let { value, onChange }: Props = $props();
+	let { value, onChange, flushRef }: Props = $props();
+
+	const EMIT_DEBOUNCE_MS = 400;
+	let emitTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function flushEmit() {
+		if (emitTimer) {
+			clearTimeout(emitTimer);
+			emitTimer = null;
+		}
+		if (!editor) return;
+		const md = toMarkdown(editor);
+		if (md === lastEmitted) return;
+		lastEmitted = md;
+		onChange(md);
+	}
+
+	$effect(() => {
+		if (flushRef) flushRef(flushEmit);
+	});
 
 	let host: HTMLDivElement;
 	let bubbleEl: HTMLDivElement | null = $state(null);
@@ -74,15 +94,13 @@
 						'prose prose-neutral dark:prose-invert max-w-none focus:outline-none min-h-full'
 				}
 			},
-			onUpdate: ({ editor: instance }) => {
+			onUpdate: () => {
 				if (suppressUpdate) return;
-				const md = toMarkdown(instance);
-				// Guard against TipTap's markdown round-trip instability on large
-				// docs: if the serialized content already matches what we loaded,
-				// don't write it back — otherwise we'd loop through setContent.
-				if (md === lastEmitted) return;
-				lastEmitted = md;
-				onChange(md);
+				// Debounce serialization — toMarkdown is O(doc size), so running
+				// it per keystroke melts the CPU on large files. Let edits settle
+				// briefly, then flush. Cmd+S flushes synchronously via flushRef.
+				if (emitTimer) clearTimeout(emitTimer);
+				emitTimer = setTimeout(flushEmit, EMIT_DEBOUNCE_MS);
 			}
 		});
 		suppressUpdate = true;
@@ -108,6 +126,7 @@
 	});
 
 	onDestroy(() => {
+		if (emitTimer) clearTimeout(emitTimer);
 		editor?.destroy();
 		editor = null;
 	});

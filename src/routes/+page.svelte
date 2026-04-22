@@ -164,7 +164,11 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 		}, 500);
 	}
 
+	let flushEditor: (() => void) | null = null;
+
 	async function save() {
+		// Pull in any pending edits from the debounced serializer.
+		flushEditor?.();
 		if (!loadedPath) return;
 		if (!dirty) return;
 		saving = true;
@@ -181,6 +185,7 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 	}
 
 	async function saveAs() {
+		flushEditor?.();
 		const { save: saveDialog } = await import('@tauri-apps/plugin-dialog');
 		const picked = await saveDialog({
 			defaultPath: loadedPath ?? 'untitled.md',
@@ -296,7 +301,11 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 			<FileTree onSelect={openPath} />
 		</aside>
 		<main class="min-h-0 overflow-hidden">
-			<Editor value={docText} onChange={onEditorChange} />
+			<Editor
+				value={docText}
+				onChange={onEditorChange}
+				flushRef={(fn) => (flushEditor = fn)}
+			/>
 		</main>
 		{#if aiOpen}
 			<aside
