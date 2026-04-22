@@ -50,13 +50,16 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 	$effect(() => {
 		// Reload the open file when the watcher fires a change and it's our file
 		workspace.changeTick;
-		if (!loadedPath) return;
+		const path = loadedPath;
+		console.debug('[reload] fire', { tick: workspace.changeTick, path, dirty });
+		if (!path) return;
 		void (async () => {
 			try {
-				const next = await readFile(loadedPath);
+				const next = await readFile(path);
 				if (!dirty && next !== docText) {
+					console.debug('[reload] applying', path);
 					docText = next;
-					status = `Reloaded · ${loadedPath}`;
+					status = `Reloaded · ${path}`;
 				}
 			} catch {
 				/* file may have been deleted or moved */
@@ -72,13 +75,16 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 	}
 
 	async function openPath(path: string) {
+		console.debug('[openPath] start', path);
 		try {
 			docText = await readFile(path);
 			loadedPath = path;
 			dirty = false;
 			status = path;
 			await workspace.setOpenPath(path);
+			console.debug('[openPath] done', path);
 		} catch (e) {
+			console.debug('[openPath] err', e);
 			status = `Open failed: ${e}`;
 		}
 	}
@@ -114,21 +120,25 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 	let creating = $state(false);
 
 	async function newFile() {
-		if (creating) return;
+		console.debug('[newFile] start');
+		if (creating) {
+			console.debug('[newFile] already creating, bail');
+			return;
+		}
 		if (!workspace.root) {
 			status = 'Open a workspace folder first to create a new file.';
 			return;
 		}
 		creating = true;
 		try {
-			// Save any pending edits to the currently-open file first.
 			if (loadedPath && dirty) {
+				console.debug('[newFile] saving dirty');
 				await save();
 			}
-			// Refresh so uniqueUntitled sees the latest tree state.
 			await workspace.refresh();
 			const name = uniqueUntitled(workspace.entries);
 			const target = joinPath(workspace.root, name);
+			console.debug('[newFile] write', target);
 			await writeFile(target, '');
 			docText = '';
 			loadedPath = target;
@@ -136,7 +146,9 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 			status = `New file · ${target}`;
 			await workspace.setOpenPath(target);
 			await workspace.refresh();
+			console.debug('[newFile] done');
 		} catch (e) {
+			console.debug('[newFile] err', e);
 			status = `New file failed: ${e}`;
 		} finally {
 			creating = false;

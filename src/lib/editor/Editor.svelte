@@ -96,6 +96,7 @@
 		const nextValue = value;
 		if (!editor) return;
 		if (nextValue === lastEmitted) return;
+		console.debug('[editor] setContent', nextValue.length, 'chars');
 		suppressUpdate = true;
 		fromMarkdown(editor, nextValue);
 		lastEmitted = toMarkdown(editor);
