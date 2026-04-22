@@ -25,8 +25,13 @@
 		}
 		if (!editor) return;
 		const md = toMarkdown(editor);
-		if (md === lastEmitted) return;
-		lastEmitted = md;
+		if (md === lastSynced) return;
+		// Update the shared baseline BEFORE propagating to the parent.
+		// When the parent's reactive `value` change re-fires the content-sync
+		// effect, nextValue === lastSynced will be true and the effect skips.
+		// Breaks the feedback loop that otherwise forms when tiptap-markdown's
+		// round-trip isn't stable on large documents.
+		lastSynced = md;
 		onChange(md);
 	}
 
@@ -37,7 +42,11 @@
 	let host: HTMLDivElement;
 	let bubbleEl: HTMLDivElement | null = $state(null);
 	let editor: Editor | null = $state(null);
-	let lastEmitted = '';
+	// lastSynced is the content string that the editor is currently showing
+	// (as would be produced by toMarkdown). Both the content-sync effect and
+	// flushEmit write to it; the content-sync effect skips when its input
+	// matches, breaking setContent/onUpdate feedback loops.
+	let lastSynced = '';
 	let suppressUpdate = false;
 
 	let slashOpen = $state(false);
@@ -105,7 +114,7 @@
 		});
 		suppressUpdate = true;
 		ed.commands.setContent(initial, { emitUpdate: false });
-		lastEmitted = toMarkdown(ed);
+		lastSynced = initial;
 		suppressUpdate = false;
 		editor = ed;
 		return () => {
@@ -117,11 +126,14 @@
 	$effect(() => {
 		const nextValue = value;
 		if (!editor) return;
-		if (nextValue === lastEmitted) return;
+		if (nextValue === lastSynced) return;
 		console.debug('[editor] setContent', nextValue.length, 'chars');
 		suppressUpdate = true;
 		fromMarkdown(editor, nextValue);
-		lastEmitted = toMarkdown(editor);
+		// Track the INPUT we just loaded, not the round-tripped serialization.
+		// If the round-trip isn't lossless, subsequent flushEmit will update
+		// lastSynced to the actual serialized form, and the pair converges.
+		lastSynced = nextValue;
 		suppressUpdate = false;
 	});
 
