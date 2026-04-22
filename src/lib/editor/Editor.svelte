@@ -77,6 +77,10 @@
 			onUpdate: ({ editor: instance }) => {
 				if (suppressUpdate) return;
 				const md = toMarkdown(instance);
+				// Guard against TipTap's markdown round-trip instability on large
+				// docs: if the serialized content already matches what we loaded,
+				// don't write it back — otherwise we'd loop through setContent.
+				if (md === lastEmitted) return;
 				lastEmitted = md;
 				onChange(md);
 			}
