@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { open } from '@tauri-apps/plugin-dialog';
 	import { readFile, writeFile } from '$lib/tauri';
 	import { workspace } from '$lib/workspace/store.svelte';
@@ -48,20 +48,25 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 	});
 
 	$effect(() => {
-		// Reload the open file when the watcher fires a change and it's our file
+		// Reload the open file when the watcher fires a change and it's our file.
+		// Only changeTick should drive this — loadedPath/docText/dirty changes
+		// happen during normal open/new/edit and would race with in-flight loads.
 		workspace.changeTick;
-		if (!loadedPath) return;
-		void (async () => {
-			try {
-				const next = await readFile(loadedPath);
-				if (!dirty && next !== docText) {
-					docText = next;
-					status = `Reloaded · ${loadedPath}`;
+		untrack(() => {
+			const path = loadedPath;
+			if (!path) return;
+			void (async () => {
+				try {
+					const next = await readFile(path);
+					if (!dirty && next !== docText) {
+						docText = next;
+						status = `Reloaded · ${path}`;
+					}
+				} catch {
+					/* file may have been deleted or moved */
 				}
-			} catch {
-				/* file may have been deleted or moved */
-			}
-		})();
+			})();
+		});
 	});
 
 	async function pickWorkspace() {
