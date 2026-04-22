@@ -8,6 +8,7 @@
 	import ChatPanel from '$lib/ai/ChatPanel.svelte';
 	import SettingsModal from '$lib/settings/SettingsModal.svelte';
 	import { syncStore } from '$lib/sync/store.svelte';
+	import { ragStore } from '$lib/rag/store.svelte';
 
 	const WELCOME = `# Welcome to jsmde
 
@@ -39,6 +40,7 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 			}
 		});
 		void syncStore.init();
+		void ragStore.init();
 		return () => {
 			workspace.teardown();
 			syncStore.teardown();

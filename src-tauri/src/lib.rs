@@ -3,11 +3,13 @@ mod commands;
 mod db;
 mod keychain;
 mod paths;
+mod rag;
 mod sync;
 mod workspace;
 
 use commands::ai as ai_cmds;
 use commands::fs as fs_cmds;
+use commands::rag as rag_cmds;
 use commands::sync as sync_cmds;
 use tauri::Manager;
 use workspace::watcher as ws;
@@ -61,6 +63,12 @@ pub fn run() {
             sync_cmds::gdrive_sign_in,
             sync_cmds::gdrive_sign_out,
             sync_cmds::sync_run,
+            rag_cmds::rag_status,
+            rag_cmds::rag_set_enabled,
+            rag_cmds::rag_reindex,
+            rag_cmds::rag_reindex_file,
+            rag_cmds::rag_search,
+            rag_cmds::rag_clear,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

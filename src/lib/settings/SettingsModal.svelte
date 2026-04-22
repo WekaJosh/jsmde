@@ -3,12 +3,19 @@
 	import { aiStore } from '$lib/ai/store.svelte';
 	import { deleteApiKey, hasApiKey, saveApiKey } from '$lib/ai/client';
 	import CloudPane from './CloudPane.svelte';
+	import RagPane from './RagPane.svelte';
+	import { ragStore } from '$lib/rag/store.svelte';
+	import { workspace } from '$lib/workspace/store.svelte';
 
 	type Props = { open: boolean; onClose: () => void };
 	let { open, onClose }: Props = $props();
 
-	type Tab = 'ai' | 'cloud';
+	type Tab = 'ai' | 'cloud' | 'rag';
 	let tab = $state<Tab>('ai');
+
+	$effect(() => {
+		if (open) void ragStore.refresh(workspace.root);
+	});
 
 	let selectedProvider = $state<ProviderId>(aiStore.provider);
 	let modelInput = $state(aiStore.model);
@@ -125,6 +132,14 @@
 						Cloud
 					</button>
 					<button
+						class="rounded px-2 py-1 text-xs {tab === 'rag'
+							? 'bg-neutral-200 dark:bg-neutral-800'
+							: 'text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
+						onclick={() => (tab = 'rag')}
+					>
+						Vault
+					</button>
+					<button
 						class="ml-2 rounded px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
 						onclick={onClose}
 						aria-label="Close">✕</button
@@ -212,8 +227,10 @@
 						{/if}
 					</div>
 				</div>
-			{:else}
+			{:else if tab === 'cloud'}
 				<CloudPane />
+			{:else}
+				<RagPane />
 			{/if}
 			<div
 				class="flex justify-end gap-2 border-t border-neutral-200 px-4 py-3 dark:border-neutral-800"

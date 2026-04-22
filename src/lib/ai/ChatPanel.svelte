@@ -2,6 +2,9 @@
 	import { aiStore } from './store.svelte';
 	import { PROVIDERS } from './providers';
 	import { chatStream, type ChatMessage, type ChatStreamHandle } from './client';
+	import { ragStore } from '$lib/rag/store.svelte';
+	import { ragSearch } from '$lib/rag/client';
+	import { workspace } from '$lib/workspace/store.svelte';
 
 	type Props = {
 		docText: string;
@@ -41,9 +44,29 @@
 		messages = [...messages, userMsg, assistantMsg];
 		busy = true;
 
-		const system = aiStore.useDocContext && docText.trim()
+		let vaultBlock = '';
+		if (ragStore.enabled && ragStore.useVaultContext && workspace.root) {
+			try {
+				const hits = await ragSearch(workspace.root, trimmed, 5);
+				if (hits.length > 0) {
+					const chunks = hits
+						.map(
+							(h) =>
+								`<note path="${h.rel_path}" score="${h.score.toFixed(3)}">\n${h.content}\n</note>`
+						)
+						.join('\n\n');
+					vaultBlock = `Relevant notes from the user's vault follow. Cite by path when useful.\n${chunks}`;
+				}
+			} catch (e) {
+				console.warn('rag search failed', e);
+			}
+		}
+
+		const docBlock = aiStore.useDocContext && docText.trim()
 			? `The user is editing a markdown document. Current contents follow between <doc> tags. Refer to it only when relevant.\n<doc>\n${clamp(docText, 80_000)}\n</doc>`
-			: undefined;
+			: '';
+
+		const system = [vaultBlock, docBlock].filter(Boolean).join('\n\n') || undefined;
 
 		const toSend: ChatMessage[] = messages
 			.slice(0, -1)
@@ -126,6 +149,18 @@
 				/>
 				doc context
 			</label>
+			{#if ragStore.enabled}
+				<label class="flex cursor-pointer items-center gap-1 text-[11px] text-neutral-500">
+					<input
+						type="checkbox"
+						class="h-3 w-3"
+						checked={ragStore.useVaultContext}
+						onchange={(e) =>
+							ragStore.setUseVaultContext((e.currentTarget as HTMLInputElement).checked)}
+					/>
+					vault
+				</label>
+			{/if}
 			<button
 				class="text-[11px] text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200"
 				onclick={reset}
