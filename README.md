@@ -13,6 +13,31 @@ Simple, beautiful, lightweight markdown editor. Tauri 2 + SvelteKit + Tailwind 4
 - **Google Drive sync** — OAuth PKCE (bring your own client ID), conflict-aware reconciliation with `.conflict-<ISO>.md` sidecars, SQLite metadata DB
 - **Lightweight** — Tauri 2 shell, release profile tuned for small bundles
 
+## Install
+
+Download the appropriate installer from [Releases](https://github.com/WekaJosh/jsmde/releases).
+
+### macOS
+
+The DMGs are unsigned, so Gatekeeper will say the app is "damaged and can't be opened". It isn't — macOS just refuses to run unsigned downloads. After dragging the app into `/Applications`, run this once in Terminal:
+
+```sh
+xattr -rd com.apple.quarantine /Applications/jsmde.app
+```
+
+Then launch normally.
+
+- `jsmde_*_aarch64.dmg` — Apple Silicon (M1/M2/M3/M4)
+- `jsmde_*_x64.dmg` — Intel
+
+### Windows
+
+Run `jsmde_*_x64-setup.exe` or `jsmde_*_x64_en-US.msi`. The binaries are unsigned; on the SmartScreen warning click "More info" → "Run anyway".
+
+### Linux
+
+Pick `.AppImage`, `.deb`, or `.rpm` depending on your distribution.
+
 ## Keyboard
 
 - `Cmd/Ctrl + S` save
