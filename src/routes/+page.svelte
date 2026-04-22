@@ -93,6 +93,56 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 		await openPath(picked);
 	}
 
+	function joinPath(parent: string, name: string): string {
+		// If the path contains any backslash, treat it as Windows-native.
+		const sep = parent.includes('\\') ? '\\' : '/';
+		const trimmed = parent.replace(/[\\/]+$/, '');
+		return `${trimmed}${sep}${name}`;
+	}
+
+	function uniqueUntitled(entries: { name: string }[]): string {
+		const existing = new Set(entries.map((e) => e.name.toLowerCase()));
+		let name = 'Untitled.md';
+		if (!existing.has(name.toLowerCase())) return name;
+		for (let i = 2; i < 10_000; i++) {
+			name = `Untitled ${i}.md`;
+			if (!existing.has(name.toLowerCase())) return name;
+		}
+		return `Untitled ${Date.now()}.md`;
+	}
+
+	let creating = $state(false);
+
+	async function newFile() {
+		if (creating) return;
+		if (!workspace.root) {
+			status = 'Open a workspace folder first to create a new file.';
+			return;
+		}
+		creating = true;
+		try {
+			// Save any pending edits to the currently-open file first.
+			if (loadedPath && dirty) {
+				await save();
+			}
+			// Refresh so uniqueUntitled sees the latest tree state.
+			await workspace.refresh();
+			const name = uniqueUntitled(workspace.entries);
+			const target = joinPath(workspace.root, name);
+			await writeFile(target, '');
+			docText = '';
+			loadedPath = target;
+			dirty = false;
+			status = `New file · ${target}`;
+			await workspace.setOpenPath(target);
+			await workspace.refresh();
+		} catch (e) {
+			status = `New file failed: ${e}`;
+		} finally {
+			creating = false;
+		}
+	}
+
 	function onEditorChange(next: string) {
 		docText = next;
 		dirty = true;
@@ -147,6 +197,9 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 			e.preventDefault();
 			if (e.shiftKey) void pickFile();
 			else void pickWorkspace();
+		} else if (e.key === 'n') {
+			e.preventDefault();
+			void newFile();
 		}
 	}
 </script>
@@ -169,6 +222,16 @@ _Next up: AI chat (M2) and Google Drive sync (M3)._
 			{/if}
 		</div>
 		<div class="flex items-center gap-2">
+			<button
+				class="rounded-md border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+				title={workspace.root
+					? 'New file (⌘N)'
+					: 'Open a workspace folder first'}
+				onclick={newFile}
+				disabled={!workspace.root || creating}
+			>
+				New
+			</button>
 			<button
 				class="rounded-md border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
 				onclick={pickWorkspace}

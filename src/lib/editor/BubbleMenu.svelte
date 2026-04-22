@@ -69,7 +69,7 @@
 <div
 	bind:this={menuEl}
 	class="bubble-menu z-50 flex items-center gap-0.5 rounded-md border border-neutral-300 bg-white p-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
-	style="display: none"
+	style="visibility: hidden; opacity: 0; position: fixed; top: 0; left: 0;"
 >
 	{#if editor}
 		{@render btn({

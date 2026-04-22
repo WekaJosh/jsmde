@@ -40,6 +40,7 @@ Pick `.AppImage`, `.deb`, or `.rpm` depending on your distribution.
 
 ## Keyboard
 
+- `Cmd/Ctrl + N` new file (auto-named `Untitled N.md` in workspace root)
 - `Cmd/Ctrl + S` save
 - `Cmd/Ctrl + O` open workspace folder
 - `Cmd/Ctrl + Shift + O` open individual file

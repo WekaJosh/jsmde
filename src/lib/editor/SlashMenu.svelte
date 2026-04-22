@@ -12,7 +12,7 @@
 	let { open, rect, items, selectedIndex, onPick }: Props = $props();
 
 	const style = $derived.by(() => {
-		if (!rect) return 'display: none';
+		if (!rect) return '';
 		const top = rect.bottom + 6;
 		const left = rect.left;
 		return `top: ${top}px; left: ${left}px`;
@@ -27,7 +27,7 @@
 	});
 </script>
 
-{#if open && items.length > 0}
+{#if open && items.length > 0 && rect}
 	<div
 		class="slash-menu fixed z-50 max-h-72 w-64 overflow-auto rounded-md border border-neutral-300 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
 		style={style}

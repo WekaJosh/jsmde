@@ -47,7 +47,11 @@ export function buildExtensions(menu: MenuElements) {
 			? [
 					BubbleMenu.configure({
 						element: menu.bubble,
-						options: { placement: 'top' as const, offset: 8 },
+						options: {
+							placement: 'top' as const,
+							strategy: 'fixed' as const,
+							offset: 8
+						},
 						shouldShow: ({ editor, from, to }) => {
 							if (from === to) return false;
 							if (editor.isActive('codeBlock')) return false;
