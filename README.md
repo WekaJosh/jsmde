@@ -4,36 +4,6 @@ Simple, beautiful, lightweight markdown editor. Tauri 2 + SvelteKit + Tailwind 4
 
 **Status:** M4 — MVP complete. Open/edit/autosave locally, chat with Claude or any AI provider, sync to Google Drive.
 
-Full plan: `~/.claude/plans/i-need-a-markdown-keen-dove.md`.
-Release steps: [RELEASE.md](RELEASE.md).
-
-## Run
-
-```sh
-pnpm install
-pnpm tauri dev        # desktop app with hot reload
-```
-
-Browser-only shell (no Tauri APIs wired):
-
-```sh
-pnpm dev
-```
-
-## Build
-
-```sh
-pnpm tauri build      # .dmg / .msi / .AppImage, <20MB target
-```
-
-## Quality gates
-
-```sh
-pnpm check            # svelte-check + tsc
-pnpm test             # vitest
-cd src-tauri && cargo check
-```
-
 ## Features
 
 - **WYSIWYG editor** — TipTap 3 with markdown round-trip
