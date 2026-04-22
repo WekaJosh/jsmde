@@ -1,5 +1,5 @@
 use notify::RecursiveMode;
-use notify_debouncer_full::{new_debouncer, DebouncedEvent, Debouncer, FileIdMap};
+use notify_debouncer_full::{new_debouncer, DebouncedEvent, Debouncer, RecommendedCache};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -17,7 +17,7 @@ pub struct WatcherState {
 }
 
 struct ActiveWatcher {
-    _debouncer: Debouncer<notify::RecommendedWatcher, FileIdMap>,
+    _debouncer: Debouncer<notify::RecommendedWatcher, RecommendedCache>,
     root: PathBuf,
 }
 
