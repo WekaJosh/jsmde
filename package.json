@@ -33,6 +33,8 @@
 		"@tauri-apps/api": "^2.10.1",
 		"@tauri-apps/plugin-dialog": "^2.7.0",
 		"@tiptap/core": "^3.22.4",
+		"@tiptap/extension-bubble-menu": "^3.22.4",
+		"@tiptap/extension-floating-menu": "^3.22.4",
 		"@tiptap/extension-link": "^3.22.4",
 		"@tiptap/extension-placeholder": "^3.22.4",
 		"@tiptap/extension-table": "^3.22.4",
@@ -40,6 +42,7 @@
 		"@tiptap/extension-task-list": "^3.22.4",
 		"@tiptap/pm": "^3.22.4",
 		"@tiptap/starter-kit": "^3.22.4",
+		"@tiptap/suggestion": "^3.22.4",
 		"dompurify": "^3.4.1",
 		"marked": "^18.0.2",
 		"tiptap-markdown": "^0.9.0"

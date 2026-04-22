@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { Editor } from '@tiptap/core';
 	import { onDestroy, untrack } from 'svelte';
-	import { buildExtensions } from './extensions';
+	import { buildExtensions, type MenuElements } from './extensions';
 	import { fromMarkdown, toMarkdown } from './markdown';
+	import BubbleMenu from './BubbleMenu.svelte';
+	import SlashMenu from './SlashMenu.svelte';
+	import type { SlashCommand, SlashHandler } from './slashCommands';
 
 	type Props = {
 		value: string;
@@ -12,16 +15,58 @@
 	let { value, onChange }: Props = $props();
 
 	let host: HTMLDivElement;
+	let bubbleEl: HTMLDivElement | null = $state(null);
 	let editor: Editor | null = $state(null);
 	let lastEmitted = '';
 	let suppressUpdate = false;
 
+	let slashOpen = $state(false);
+	let slashRect = $state<DOMRect | null>(null);
+	let slashItems = $state<SlashCommand[]>([]);
+	let slashSelected = $state(0);
+	let slashPick: (i: number) => void = () => {};
+
+	const slashHandler: SlashHandler = {
+		onOpen: ({ rect, items, selectedIndex }) => {
+			slashItems = items;
+			slashRect = rect;
+			slashSelected = selectedIndex;
+			slashOpen = true;
+		},
+		onUpdate: ({ rect, items, selectedIndex }) => {
+			slashItems = items;
+			slashRect = rect;
+			slashSelected = selectedIndex;
+		},
+		onClose: () => {
+			slashOpen = false;
+			slashItems = [];
+			slashRect = null;
+		},
+		bindPick: (fn) => {
+			slashPick = fn;
+		}
+	};
+
+	function pickSlashItem(i: number) {
+		slashPick(i);
+	}
+
+	function ensureBubbleVisible(el: HTMLDivElement) {
+		bubbleEl = el;
+	}
+
 	$effect(() => {
 		if (!host) return;
+		if (!bubbleEl) return;
 		const initial = untrack(() => value);
+		const menus: MenuElements = {
+			bubble: bubbleEl,
+			slash: slashHandler
+		};
 		const ed = new Editor({
 			element: host,
-			extensions: buildExtensions(),
+			extensions: buildExtensions(menus),
 			content: '',
 			editorProps: {
 				attributes: {
@@ -66,6 +111,16 @@
 <div class="flex h-full flex-col overflow-auto">
 	<div bind:this={host} class="mx-auto w-full max-w-3xl flex-1 px-8 py-10"></div>
 </div>
+
+<BubbleMenu {editor} bindEl={ensureBubbleVisible} />
+
+<SlashMenu
+	open={slashOpen}
+	rect={slashRect}
+	items={slashItems}
+	selectedIndex={slashSelected}
+	onPick={pickSlashItem}
+/>
 
 <style>
 	:global(.ProseMirror) {
