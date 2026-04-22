@@ -5,6 +5,7 @@
 	import { ragStore } from '$lib/rag/store.svelte';
 	import { ragSearch } from '$lib/rag/client';
 	import { workspace } from '$lib/workspace/store.svelte';
+	import { renderMarkdown } from '$lib/editor/markdown';
 
 	type Props = {
 		docText: string;
@@ -188,9 +189,16 @@
 				<div class="mb-1 text-[10px] uppercase tracking-wider text-neutral-400">
 					{m.role}{m.streaming ? ' · streaming' : ''}
 				</div>
-				<div class="whitespace-pre-wrap break-words text-neutral-900 dark:text-neutral-100">
-					{m.content}{#if m.streaming}<span class="animate-pulse">▌</span>{/if}
-				</div>
+				{#if m.role === 'assistant'}
+					<div class="chat-markdown prose prose-sm max-w-none break-words dark:prose-invert">
+						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+						{@html renderMarkdown(m.content)}{#if m.streaming}<span class="animate-pulse">▌</span>{/if}
+					</div>
+				{:else}
+					<div class="whitespace-pre-wrap break-words text-neutral-900 dark:text-neutral-100">
+						{m.content}
+					</div>
+				{/if}
 			</div>
 		{/each}
 		{#if errorText}
@@ -229,3 +237,34 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	/* Tighten prose defaults for the small chat bubble so markdown doesn't
+	   feel overly spacious. Marked output is HTML injected via {@html};
+	   :global lets us style descendants that aren't in our component scope. */
+	:global(.chat-markdown > *:first-child) {
+		margin-top: 0;
+	}
+	:global(.chat-markdown > *:last-child) {
+		margin-bottom: 0;
+	}
+	:global(.chat-markdown p),
+	:global(.chat-markdown ul),
+	:global(.chat-markdown ol),
+	:global(.chat-markdown pre),
+	:global(.chat-markdown blockquote) {
+		margin: 0.5em 0;
+	}
+	:global(.chat-markdown li) {
+		margin: 0.125em 0;
+	}
+	:global(.chat-markdown h1),
+	:global(.chat-markdown h2),
+	:global(.chat-markdown h3) {
+		margin: 0.6em 0 0.3em;
+	}
+	:global(.chat-markdown pre) {
+		padding: 0.5em;
+		overflow-x: auto;
+	}
+</style>
